@@ -1,0 +1,37 @@
+[Webhook("On files changed", typeof(PushActionHandler), Description = "On files changed")]
+        public async Task<WebhookResponse<FilesListResponse>> FilesAddedHandler(WebhookRequest webhookRequest,
+            [WebhookParameter] FilesChangedInput input)
+        {
+            var data = JsonConvert.DeserializeObject<PushPayload>(webhookRequest.Body.ToString());
+            if (data is null) { throw new InvalidCastException(nameof(webhookRequest.Body)); }
+
+            var files = new List<FileId>();
+            data.Commits.ForEach(c => {
+                if (input.Added)
+                {
+                    files.AddRange(c.Added.Where(f => input.FolderPath is null || f.Contains(input.FolderPath))
+                        .Select(fileId => new FileId() { FilePath = fileId }));
+                }
+                if (input.Modified)
+                {
+                    files.AddRange(c.Modified.Where(f => input.FolderPath is null || f.Contains(input.FolderPath))
+                        .Select(fileId => new FileId() { FilePath = fileId }));
+                }
+                if (input.Removed) 
+                {
+                    files.AddRange(c.Removed.Where(f => input.FolderPath is null || f.Contains(input.FolderPath))
+                        .Select(fileId => new FileId() { FilePath = fileId }));
+                }
+            });
+            if (files.Any())
+            {
+                return new WebhookResponse<FilesListResponse>
+                {
+                    HttpResponseMessage = null,
+                    Result = new FilesListResponse() { 
+                        Files = files, 
+                    }
+                };
+            }
+            return new WebhookResponse<FilesListResponse> { HttpResponseMessage = new HttpResponseMessage(statusCode: HttpStatusCode.OK) };
+        }
